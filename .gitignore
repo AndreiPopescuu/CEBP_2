@@ -1,0 +1,22 @@
+# Fisiere compilate (nu avem nevoie de ele)
+target/
+out/
+*.class
+
+# Fisiere specifice IntelliJ (setari locale)
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Loguri
+*.log
+
+# Fisiere de sistem Windows/Mac
+Thumbs.db
+.DS_Store
+
+# Alte fisiere temporare
+.mvn/
+mvnw
+mvnw.cmd
