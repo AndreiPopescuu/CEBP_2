@@ -9,5 +9,4 @@ public class 	InsightServiceApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(InsightServiceApplication.class, args);
 	}
-
 }
