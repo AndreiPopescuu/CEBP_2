@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  # 1. DATABASE (NEW!)
+  postgres:
+    image: postgres:15-alpine
+    container_name: bureaucracy-db
+    ports:
+      - "5432:5432"  # Allows you to connect using a tool like DBeaver/pgAdmin
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=admin
+      - POSTGRES_DB=bureaucracy_db
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U admin -d bureaucracy_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. BROKER (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: bureaucracy-broker
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 3. SERVER A (Bureaucracy Service)
+  bureaucracy-service:
+    build:
+      context: ./demo
+      dockerfile: Dockerfile
+      args:
+        JAR_FILE: "target/demo-0.0.1-SNAPSHOT.jar" # Make sure this matches your actual jar name!
+    container_name: server-a
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      postgres:   # <--- WAITS FOR DB TO START
+        condition: service_healthy
+    ports: ["8080:8080"]
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SERVER_PORT: 8080
+      # We will add DB connection strings here later, or in application.properties
+
+  # 4. SERVER B (Insight Service)
+  insight-service:
+    build:
+      context: ./insight
+      dockerfile: Dockerfile
+      args:
+        JAR_FILE: "target/insight-0.0.1-SNAPSHOT.jar" # Make sure this matches your actual jar name!
+    container_name: insight-service
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    ports: ["8081:8081"]
+    environment:
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SERVER_PORT: 8081

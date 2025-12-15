@@ -15,7 +15,6 @@ public class EventPublisher {
     private final RabbitTemplate rabbitTemplate;
     private final AmqpAdmin amqpAdmin;
 
-    // Constructor Injection for RabbitMQ tools
     public EventPublisher(RabbitTemplate rabbitTemplate, AmqpAdmin amqpAdmin) {
         this.rabbitTemplate = rabbitTemplate;
         this.amqpAdmin = amqpAdmin;
@@ -28,7 +27,6 @@ public class EventPublisher {
     @PostConstruct
     public void init() {
         try {
-            // Create the queue named "bureaucracy-logs"
             amqpAdmin.declareQueue(new Queue("bureaucracy-logs", true));
             System.out.println("\n==========================================");
             System.out.println("✅ CONNECTED TO DOCKER RABBITMQ");
@@ -48,10 +46,8 @@ public class EventPublisher {
         event.put("client", clientName);
         event.put("message", message);
 
-        // 1. Print to local console (so you can see it working)
         System.out.println("[EVENT] " + event);
 
-        // 2. Send to RabbitMQ (Docker)
         try {
             rabbitTemplate.convertAndSend("bureaucracy-logs", event);
         } catch (Exception e) {

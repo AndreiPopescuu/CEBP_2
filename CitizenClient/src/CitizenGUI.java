@@ -1,9 +1,13 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.event.ActionEvent;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Random;
 import java.util.concurrent.CompletableFuture;
 
@@ -13,108 +17,131 @@ public class CitizenGUI extends JFrame {
     private final JTextArea logArea;
     private final HttpClient httpClient;
 
+    private final List<JCheckBox> documentCheckboxes = new ArrayList<>();
+
     public CitizenGUI() {
-        // 1. Configurare Fereastră
-        setTitle("Portalul Cetățeanului (Client App)");
-        setSize(600, 600); // Mai mare pentru butonul de test
+        setTitle("Portalul Cetățeanului");
+        setSize(600, 650);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // 2. Setup HTTP Client
         httpClient = HttpClient.newHttpClient();
 
-        // --- PANOU DE SUS (Input) ---
         JPanel topPanel = new JPanel(new FlowLayout());
         topPanel.add(new JLabel("Nume Cetățean:"));
         nameField = new JTextField("Cetatean-" + new Random().nextInt(100), 15);
         topPanel.add(nameField);
         add(topPanel, BorderLayout.NORTH);
 
-        // --- PANOU CENTRAL (Butoane Documente) ---
-        JPanel centerPanel = new JPanel(new GridLayout(5, 2, 10, 10)); // 5 randuri
-        centerPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
+        JPanel centerContainer = new JPanel(new BorderLayout());
 
-        JButton btnPassport = new JButton("📘 PAȘAPORT (Final Boss)");
-        JButton btnID = new JButton("🪪 Carte de Identitate");
-        JButton btnBirth = new JButton("👶 Certificat de Naștere");
-        JButton btnMarriage = new JButton("💍 Certificat de Căsătorie");
-        JButton btnFiscal = new JButton("💰 Certificat Fiscal");
-        JButton btnDomicile = new JButton("🏠 Adeverință Domiciliu");
-        JButton btnTax = new JButton("🧾 Chitanță Taxă");
-        JButton btnRequest = new JButton("📝 Cerere Pașaport");
+        JPanel checkboxPanel = new JPanel(new GridLayout(4, 2, 10, 10));
+        checkboxPanel.setBorder(BorderFactory.createEmptyBorder(10, 20, 10, 20));
 
-        // Butonul Special de STRESS TEST
+        String[] docNames = {
+                "Pasaport",
+                "Carte de identitate",
+                "Certificat de nastere",
+                "Certificat de casatorie",
+                "Certificat fiscal",
+                "Adeverinta de domiciliu",
+                "Chitanta taxa pasaport",
+                "Cerere pasaport"
+        };
+
+        for (String docName : docNames) {
+            JCheckBox checkBox = new JCheckBox(docName);
+            checkBox.setFont(new Font("Arial", Font.BOLD, 14));
+            documentCheckboxes.add(checkBox);
+            checkboxPanel.add(checkBox);
+        }
+
         JButton btnStress = new JButton("⚔️ TEST CONCURENȚĂ (5 Clienți)");
-        btnStress.setBackground(Color.PINK);
         btnStress.setFont(new Font("Arial", Font.BOLD, 12));
-
-        // Adăugăm acțiuni
-        btnPassport.addActionListener(e -> sendRequest(nameField.getText(), "Pasaport"));
-        btnID.addActionListener(e -> sendRequest(nameField.getText(), "Carte de identitate"));
-        btnBirth.addActionListener(e -> sendRequest(nameField.getText(), "Certificat de nastere"));
-        btnMarriage.addActionListener(e -> sendRequest(nameField.getText(), "Certificat de casatorie"));
-        btnFiscal.addActionListener(e -> sendRequest(nameField.getText(), "Certificat fiscal"));
-        btnDomicile.addActionListener(e -> sendRequest(nameField.getText(), "Adeverinta de domiciliu"));
-        btnTax.addActionListener(e -> sendRequest(nameField.getText(), "Chitanta taxa pasaport"));
-        btnRequest.addActionListener(e -> sendRequest(nameField.getText(), "Cerere pasaport"));
-
-        // Acțiunea de Stress Test
         btnStress.addActionListener(e -> runConcurrencyTest());
 
-        // Adăugare în panou
-        centerPanel.add(btnPassport);   centerPanel.add(btnID);
-        centerPanel.add(btnBirth);      centerPanel.add(btnMarriage);
-        centerPanel.add(btnFiscal);     centerPanel.add(btnDomicile);
-        centerPanel.add(btnTax);        centerPanel.add(btnRequest);
-
-        // Adaugam butonul de stress pe tot randul de jos
         JPanel stressPanel = new JPanel(new BorderLayout());
         stressPanel.setBorder(BorderFactory.createEmptyBorder(5, 20, 5, 20));
         stressPanel.add(btnStress, BorderLayout.CENTER);
 
-        // Container intermediar
-        JPanel mainCenter = new JPanel(new BorderLayout());
-        mainCenter.add(centerPanel, BorderLayout.CENTER);
-        mainCenter.add(stressPanel, BorderLayout.SOUTH);
+        centerContainer.add(checkboxPanel, BorderLayout.CENTER);
+        centerContainer.add(stressPanel, BorderLayout.SOUTH);
 
-        add(mainCenter, BorderLayout.CENTER);
+        add(centerContainer, BorderLayout.CENTER);
 
-        // --- PANOU DE JOS (Loguri) ---
+        JPanel bottomPanel = new JPanel(new BorderLayout());
+
+        JButton submitButton = new JButton("TRIMITE CEREREA (APPLY)");
+        submitButton.setFont(new Font("Arial", Font.BOLD, 16));
+        submitButton.addActionListener(this::onSubmit);
+
         logArea = new JTextArea(12, 40);
         logArea.setEditable(false);
         JScrollPane scrollPane = new JScrollPane(logArea);
         scrollPane.setBorder(BorderFactory.createTitledBorder("Status Cereri"));
-        add(scrollPane, BorderLayout.SOUTH);
+
+        bottomPanel.add(submitButton, BorderLayout.NORTH);
+        bottomPanel.add(scrollPane, BorderLayout.CENTER);
+
+        add(bottomPanel, BorderLayout.SOUTH);
 
         setVisible(true);
     }
 
-    // Metoda care lansează 2 clienți simultan
-    // Metoda care lansează 5 clienți simultan
+    private void onSubmit(ActionEvent e) {
+        String name = nameField.getText().trim();
+        if (name.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Introduceți un nume!");
+            return;
+        }
+
+        List<String> selectedDocs = new ArrayList<>();
+        for (JCheckBox box : documentCheckboxes) {
+            if (box.isSelected()) {
+                selectedDocs.add(box.getText());
+            }
+        }
+
+        if (selectedDocs.isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Selectați cel puțin un document!");
+            return;
+        }
+
+        sendRequest(name, selectedDocs);
+    }
+
     private void runConcurrencyTest() {
         log("⚡ PORNIRE MEGA-STRESS TEST (5 CLIENȚI)...");
         log("Se trimit 5 cereri simultane la Primărie...");
 
         for (int i = 1; i <= 5; i++) {
-            // Trebuie să facem variabilele "finale" pentru a le folosi în lambda
             final String numeClient = "Concurent-" + i;
 
-            // Lansăm cererea pe un thread separat (asincron)
             CompletableFuture.runAsync(() ->
-                    sendRequest(numeClient, "Certificat de nastere")
+                    sendRequest(numeClient, Collections.singletonList("Certificat de nastere"))
             );
         }
-
-        // Notă: Toți 5 vor cere "Certificat de naștere" pentru a bloca Ghișeul 1
-        // și a forța creșterea cozii.
     }
 
-    private void sendRequest(String inputName, String documentType) {
-        // 1. Creăm o variabilă nouă 'finală' pe care NU o mai modificăm
+    private void sendRequest(String inputName, List<String> documents) {
         final String name = (inputName == null || inputName.trim().isEmpty()) ? "Anonim" : inputName;
 
-        String jsonBody = String.format("{\"name\": \"%s\", \"documents\": [\"%s\"]}", name, documentType);
-        log("📤 [" + name + "] cere: " + documentType);
+        StringBuilder jsonBuilder = new StringBuilder();
+        jsonBuilder.append("{");
+        jsonBuilder.append("\"name\":\"").append(name).append("\",");
+        jsonBuilder.append("\"documents\":[");
+
+        for (int i = 0; i < documents.size(); i++) {
+            jsonBuilder.append("\"").append(documents.get(i)).append("\"");
+            if (i < documents.size() - 1) {
+                jsonBuilder.append(",");
+            }
+        }
+        jsonBuilder.append("]");
+        jsonBuilder.append("}");
+
+        String jsonBody = jsonBuilder.toString();
+        log("📤 [" + name + "] cere: " + documents);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:8080/api/citizens/apply"))
@@ -124,7 +151,6 @@ public class CitizenGUI extends JFrame {
 
         httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(response -> {
-                    // Acum folosim 'name' care este sigur și final
                     if (response.statusCode() == 200 || response.statusCode() == 202) {
                         log("✅ [" + name + "] Cerere acceptată.");
                     } else {
@@ -132,7 +158,7 @@ public class CitizenGUI extends JFrame {
                     }
                 })
                 .exceptionally(e -> {
-                    log("❌ EROARE CONEXIUNE");
+                    log("❌ EROARE CONEXIUNE: " + e.getMessage());
                     return null;
                 });
     }

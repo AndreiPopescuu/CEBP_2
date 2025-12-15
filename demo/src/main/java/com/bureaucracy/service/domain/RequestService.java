@@ -20,7 +20,6 @@ public class RequestService {
         this.docTypeRepo = docTypeRepo;
     }
 
-    // This annotation creates a dedicated transaction for this save action
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void saveRequest(Citizen citizen, String documentName) {
         try {
