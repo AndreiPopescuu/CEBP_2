@@ -17,6 +17,9 @@ public class Counter {
         this.name = name;
         this.publisher = publisher;
     }
+    public String getName() {
+        return this.name;
+    }
 
     public void start() {
         if (running) return;

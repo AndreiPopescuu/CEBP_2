@@ -44,7 +44,7 @@ public class CitizenGUI extends JFrame {
         JButton btnRequest = new JButton("📝 Cerere Pașaport");
 
         // Butonul Special de STRESS TEST
-        JButton btnStress = new JButton("⚔️ TEST CONCURENȚĂ (2 Clienți)");
+        JButton btnStress = new JButton("⚔️ TEST CONCURENȚĂ (5 Clienți)");
         btnStress.setBackground(Color.PINK);
         btnStress.setFont(new Font("Arial", Font.BOLD, 12));
 
