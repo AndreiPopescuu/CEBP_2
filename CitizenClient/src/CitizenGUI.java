@@ -20,19 +20,21 @@ public class CitizenGUI extends JFrame {
     private final List<JCheckBox> documentCheckboxes = new ArrayList<>();
 
     public CitizenGUI() {
-        setTitle("Portalul Cetățeanului");
-        setSize(600, 650);
+        setTitle("Portalul Cetățeanului - AI Integrated");
+        setSize(600, 700);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setLayout(new BorderLayout());
 
         httpClient = HttpClient.newHttpClient();
 
+        // --- TOP PANEL ---
         JPanel topPanel = new JPanel(new FlowLayout());
         topPanel.add(new JLabel("Nume Cetățean:"));
         nameField = new JTextField("Cetatean-" + new Random().nextInt(100), 15);
         topPanel.add(nameField);
         add(topPanel, BorderLayout.NORTH);
 
+        // --- CENTER PANEL (Checkboxes) ---
         JPanel centerContainer = new JPanel(new BorderLayout());
 
         JPanel checkboxPanel = new JPanel(new GridLayout(4, 2, 10, 10));
@@ -69,16 +71,18 @@ public class CitizenGUI extends JFrame {
 
         add(centerContainer, BorderLayout.CENTER);
 
+        // --- BOTTOM PANEL ---
         JPanel bottomPanel = new JPanel(new BorderLayout());
 
         JButton submitButton = new JButton("TRIMITE CEREREA (APPLY)");
         submitButton.setFont(new Font("Arial", Font.BOLD, 16));
         submitButton.addActionListener(this::onSubmit);
 
-        logArea = new JTextArea(12, 40);
+        logArea = new JTextArea(14, 40);
         logArea.setEditable(false);
+        logArea.setFont(new Font("Monospaced", Font.PLAIN, 12));
         JScrollPane scrollPane = new JScrollPane(logArea);
-        scrollPane.setBorder(BorderFactory.createTitledBorder("Status Cereri"));
+        scrollPane.setBorder(BorderFactory.createTitledBorder("Status & AI Reports"));
 
         bottomPanel.add(submitButton, BorderLayout.NORTH);
         bottomPanel.add(scrollPane, BorderLayout.CENTER);
@@ -97,9 +101,7 @@ public class CitizenGUI extends JFrame {
 
         List<String> selectedDocs = new ArrayList<>();
         for (JCheckBox box : documentCheckboxes) {
-            if (box.isSelected()) {
-                selectedDocs.add(box.getText());
-            }
+            if (box.isSelected()) selectedDocs.add(box.getText());
         }
 
         if (selectedDocs.isEmpty()) {
@@ -112,11 +114,8 @@ public class CitizenGUI extends JFrame {
 
     private void runConcurrencyTest() {
         log("⚡ PORNIRE MEGA-STRESS TEST (5 CLIENȚI)...");
-        log("Se trimit 5 cereri simultane la Primărie...");
-
         for (int i = 1; i <= 5; i++) {
             final String numeClient = "Concurent-" + i;
-
             CompletableFuture.runAsync(() ->
                     sendRequest(numeClient, Collections.singletonList("Certificat de nastere"))
             );
@@ -130,29 +129,27 @@ public class CitizenGUI extends JFrame {
         jsonBuilder.append("{");
         jsonBuilder.append("\"name\":\"").append(name).append("\",");
         jsonBuilder.append("\"documents\":[");
-
         for (int i = 0; i < documents.size(); i++) {
             jsonBuilder.append("\"").append(documents.get(i)).append("\"");
-            if (i < documents.size() - 1) {
-                jsonBuilder.append(",");
-            }
+            if (i < documents.size() - 1) jsonBuilder.append(",");
         }
         jsonBuilder.append("]");
         jsonBuilder.append("}");
 
-        String jsonBody = jsonBuilder.toString();
         log("📤 [" + name + "] cere: " + documents);
 
         HttpRequest request = HttpRequest.newBuilder()
                 .uri(URI.create("http://localhost:8080/api/citizens/apply"))
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+                .POST(HttpRequest.BodyPublishers.ofString(jsonBuilder.toString()))
                 .build();
 
         httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
                 .thenAccept(response -> {
                     if (response.statusCode() == 200 || response.statusCode() == 202) {
-                        log("✅ [" + name + "] Cerere acceptată.");
+                        log("✅ [" + name + "] Cerere acceptată. Așteptăm AI...");
+                        // START LISTENING FOR THE AI REPORT
+                        startPollingForReport(name);
                     } else {
                         log("❌ [" + name + "] EROARE: " + response.body());
                     }
@@ -161,6 +158,40 @@ public class CitizenGUI extends JFrame {
                     log("❌ EROARE CONEXIUNE: " + e.getMessage());
                     return null;
                 });
+    }
+
+    // --- NEW: Polling Method for AI Report ---
+    private void startPollingForReport(String name) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                int attempts = 0;
+                // Try for 40 seconds (20 * 2s)
+                while (attempts < 20) {
+                    Thread.sleep(2000); // Wait 2 seconds
+
+                    HttpRequest pollRequest = HttpRequest.newBuilder()
+                            .uri(URI.create("http://localhost:8080/api/citizens/report/" + name))
+                            .GET()
+                            .build();
+
+                    HttpResponse<String> response = httpClient.send(pollRequest, HttpResponse.BodyHandlers.ofString());
+
+                    if (response.statusCode() == 200) {
+                        String report = response.body();
+                        SwingUtilities.invokeLater(() -> {
+                            logArea.append("\n✨✨ RAPORT AI PENTRU " + name + " ✨✨\n");
+                            logArea.append(report + "\n");
+                            logArea.append("------------------------------------------------\n");
+                            logArea.setCaretPosition(logArea.getDocument().getLength());
+                        });
+                        break; // Stop polling
+                    }
+                    attempts++;
+                }
+            } catch (Exception e) {
+                // Silent fail or minimal log
+            }
+        });
     }
 
     private void log(String msg) {

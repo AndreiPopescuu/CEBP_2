@@ -5,9 +5,6 @@ import org.springframework.amqp.core.Queue;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 import jakarta.annotation.PostConstruct;
-import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class EventPublisher {
@@ -20,36 +17,25 @@ public class EventPublisher {
         this.amqpAdmin = amqpAdmin;
     }
 
-    /**
-     * This runs automatically when the server starts.
-     * It creates the queue in Docker if it doesn't exist.
-     */
     @PostConstruct
     public void init() {
         try {
+            // Ensure the queue exists
             amqpAdmin.declareQueue(new Queue("bureaucracy-logs", true));
-            System.out.println("\n==========================================");
             System.out.println("✅ CONNECTED TO DOCKER RABBITMQ");
-            System.out.println("   Queue 'bureaucracy-logs' is ready.");
-            System.out.println("==========================================\n");
         } catch (Exception e) {
-            System.err.println("\n❌ COULD NOT CONNECT TO RABBITMQ");
-            System.err.println("   Is Docker running? Is the container started?");
-            System.err.println("   Error: " + e.getMessage() + "\n");
+            System.err.println("❌ COULD NOT CONNECT TO RABBITMQ: " + e.getMessage());
         }
     }
 
     public void publishEvent(String type, String clientName, String message) {
-        Map<String, Object> event = new HashMap<>();
-        event.put("timestamp", Instant.now().toString());
-        event.put("type", type);
-        event.put("client", clientName);
-        event.put("message", message);
 
-        System.out.println("[EVENT] " + event);
+        String payload = clientName + "|" + type + "|" + message;
+
+        System.out.println("📤 LOGGING: " + payload);
 
         try {
-            rabbitTemplate.convertAndSend("bureaucracy-logs", event);
+            rabbitTemplate.convertAndSend("bureaucracy-logs", payload);
         } catch (Exception e) {
             System.err.println("⚠️ Failed to send to RabbitMQ: " + e.getMessage());
         }
